@@ -1,15 +1,24 @@
-use std::fs::File;
-use std::fmt;
-use std::io::prelude::*;
 use std::collections::HashMap;
+use std::fmt;
+use std::fs::File;
+use std::io::prelude::*;
+// use std::env;
+use tempfile::NamedTempFile;
 
 #[derive(Debug)]
 struct Entry {
     weight: f32,
-    path: String
+    path: String,
 }
 
 type Entries<'a> = HashMap<String, f32>;
+fn dump_entries(entries: &Entries) -> String {
+    let mut output = String::new();
+    for (path, weight) in entries {
+        output.push_str(format!("{}\t{}\n", weight, path).as_str());
+    }
+    output
+}
 
 impl fmt::Display for Entry {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -24,29 +33,34 @@ impl std::str::FromStr for Entry {
         let weight = parts[0].parse::<f32>();
         match weight {
             Err(_) => Err(()),
-            Ok(w) =>  Ok(Entry{weight:w, path:parts[1].to_string()})
+            Ok(w) => Ok(Entry {
+                weight: w,
+                path: parts[1].to_string(),
+            }),
         }
     }
 }
 
-fn parse_file_contents(buf:&str) -> Entries {
+fn parse_file_contents(buf: &str) -> Entries {
     buf.lines()
         .filter_map(|l| {
             let entry = l.parse::<Entry>();
             match entry {
                 Err(_) => None,
-                Ok(e) => Some((e.path, e.weight))
-            }})
+                Ok(e) => Some((e.path, e.weight)),
+            }
+        })
         .collect()
 }
 
-fn parse_file(fname:&str) -> std::io::Result<Entries> {
+fn parse_file(fname: &str) -> std::io::Result<Entries> {
     let mut aj_file = File::open(fname)?;
     let mut contents = String::new();
     aj_file.read_to_string(&mut contents)?;
     Ok(parse_file_contents(contents.as_str()))
 }
 
+#[allow(dead_code)]
 fn increase_weight(entries: &mut Entries, path: &str) {
     if let Some(weight) = entries.get_mut(path) {
         *weight += 1f32;
@@ -55,14 +69,15 @@ fn increase_weight(entries: &mut Entries, path: &str) {
     }
 }
 
-fn main()  -> std::io::Result<()>{
-    let aj_fname: & 'static str = "/home/joel/.local/share/autojump/autojump.txt";
-    let mut entries = parse_file(aj_fname)?;
-    increase_weight(&mut entries, "tuto");
-    increase_weight(&mut entries, "tuto");
-    for (p,w) in &entries {
-        println!("{} : {}", p, w);
-    }
+fn main() -> std::io::Result<()> {
+    // let args: Vec<String> = env::args().collect();
+    const AJ_DIR: &'static str = "/home/joel/.local/share/autojump/";
+    // let aj_fname: & 'static str = "/home/joel/.local/share/autojump/autojump.txt";
+    let aj_fname = AJ_DIR.to_owned() + "autojump.txt";
+    let entries = parse_file(aj_fname.as_str())?;
+    let mut aj_tmp = NamedTempFile::new_in(AJ_DIR)?;
+    aj_tmp.write_all(dump_entries(&entries).as_bytes())?;
+    aj_tmp.persist(aj_fname)?;
     Ok(())
 }
 
