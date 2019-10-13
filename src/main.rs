@@ -2,6 +2,7 @@ use std::fs::File;
 use std::fmt;
 use std::io::prelude::*;
 
+#[derive(Debug)]
 struct Entry {
     weight: f32,
     path: String
@@ -31,14 +32,37 @@ fn parse_file_contents(buf:&str) -> Vec<Entry> {
         .collect()
 }
 
-fn main()  -> std::io::Result<()>{
-    let mut aj_file = File::open("/home/joel/.local/share/autojump/autojump.txt")?;
+fn parse_file(fname:&str) -> std::io::Result<Vec<Entry>> {
+    let mut aj_file = File::open(fname)?;
     let mut contents = String::new();
     aj_file.read_to_string(&mut contents)?;
-    let entries = parse_file_contents(contents.as_str());
+    Ok(parse_file_contents(contents.as_str()))
+}
+
+fn main()  -> std::io::Result<()>{
+    let aj_fname: & 'static str = "/home/joel/.local/share/autojump/autojump.txt";
+    let entries = parse_file(aj_fname)?;
     for e in &entries {
         println!("{}", e);
     }
     println!("#3: {}", entries[3].weight);
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn read_test_file() {
+        let entries = parse_file("tests/fine.txt");
+        assert!(!entries.is_err());
+        assert_eq!(3, entries.unwrap().len());
+    }
+
+    #[test]
+    fn check_errors() {
+        let entries = parse_file("tests/nan.txt");
+        assert!(!entries.is_err());
+        assert_eq!(0, entries.unwrap().len());
+    }
 }
